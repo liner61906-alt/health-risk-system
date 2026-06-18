@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>智慧健康日誌與風險評估系統</title>
+  <style>
+    body {
+      font-family: Arial, "Microsoft JhengHei", sans-serif;
+      background: #f4f7fb;
+      margin: 0;
+      padding: 30px;
+      color: #222;
+    }
+
+    h1 {
+      text-align: center;
+      color: #1f3c68;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: white;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    }
+
+    label {
+      display: block;
+      margin-top: 10px;
+      font-weight: bold;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      box-sizing: border-box;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+
+    button {
+      margin-top: 15px;
+      padding: 10px 18px;
+      border: none;
+      border-radius: 6px;
+      background: #1f6feb;
+      color: white;
+      cursor: pointer;
+      font-size: 15px;
+    }
+
+    button:hover {
+      background: #174ea6;
+    }
+
+    .delete-btn {
+      background: #d93025;
+      padding: 6px 10px;
+      font-size: 13px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+      background: white;
+    }
+
+    th, td {
+      border: 1px solid #ddd;
+      padding: 10px;
+      text-align: center;
+    }
+
+    th {
+      background: #1f3c68;
+      color: white;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 8px 14px;
+      border-radius: 20px;
+      font-weight: bold;
+      color: white;
+    }
+
+    .low {
+      background: #2e7d32;
+    }
+
+    .middle {
+      background: #f9a825;
+    }
+
+    .high {
+      background: #c62828;
+    }
+
+    .risk-box {
+      font-size: 20px;
+      text-align: center;
+    }
+
+    .explain {
+      line-height: 1.8;
+      background: #eef4ff;
+      padding: 12px;
+      border-left: 5px solid #1f6feb;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>智慧健康日誌與風險評估系統</h1>
+
+    <div class="card">
+      <h2>系統說明</h2>
+      <div class="explain">
+        本系統讓使用者輸入每日健康資料，包含睡眠時數、步數與心情分數。
+        後端會使用決策樹邏輯，依序判斷「睡眠 → 步數 → 心情」，最後分類出低風險、中風險或高風險。
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>目前最新風險等級</h2>
+      <div id="riskBox" class="risk-box">載入中...</div>
+    </div>
+
+    <div class="card">
+      <h2>新增今日健康日誌</h2>
+
+      <form id="healthForm">
+        <label>日期</label>
+        <input type="date" id="logDate" required>
+
+        <label>睡眠時數</label>
+        <input type="number" id="sleepHours" step="0.1" min="0" max="24" placeholder="例如：7.5" required>
+
+        <label>步數</label>
+        <input type="number" id="steps" min="0" placeholder="例如：8000" required>
+
+        <label>心情分數（1～10）</label>
+        <input type="number" id="moodScore" min="1" max="10" placeholder="例如：8" required>
+
+        <button type="submit">新增並計算風險</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>歷史健康日誌</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>日期</th>
+            <th>睡眠時數</th>
+            <th>步數</th>
+            <th>心情分數</th>
+            <th>風險等級</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="logTableBody">
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('healthForm');
+    const logDate = document.getElementById('logDate');
+    const sleepHours = document.getElementById('sleepHours');
+    const steps = document.getElementById('steps');
+    const moodScore = document.getElementById('moodScore');
+    const logTableBody = document.getElementById('logTableBody');
+    const riskBox = document.getElementById('riskBox');
+
+    // 預設日期為今天
+    logDate.value = new Date().toISOString().slice(0, 10);
+
+    function getBadgeClass(riskLevel) {
+      if (riskLevel === '低風險') return 'low';
+      if (riskLevel === '中風險') return 'middle';
+      if (riskLevel === '高風險') return 'high';
+      return '';
+    }
+
+    async function loadRisk() {
+      const res = await fetch('/health-logs/risk');
+      const data = await res.json();
+
+      if (!data.risk_level) {
+        riskBox.innerHTML = '目前沒有資料';
+        return;
+      }
+
+      const badgeClass = getBadgeClass(data.risk_level);
+
+      riskBox.innerHTML = `
+        <p>日期：${data.log_date}</p>
+        <p>
+          最新風險：
+          <span class="badge ${badgeClass}">${data.risk_level}</span>
+        </p>
+        <p>睡眠：${data.sleep_hours} 小時｜步數：${data.steps}｜心情：${data.mood_score}</p>
+      `;
+    }
+
+    async function loadLogs() {
+      const res = await fetch('/health-logs');
+      const logs = await res.json();
+
+      logTableBody.innerHTML = '';
+
+      logs.forEach(log => {
+        const badgeClass = getBadgeClass(log.risk_level);
+
+        const tr = document.createElement('tr');
+
+        tr.innerHTML = `
+          <td>${log.log_date}</td>
+          <td>${log.sleep_hours}</td>
+          <td>${log.steps}</td>
+          <td>${log.mood_score}</td>
+          <td><span class="badge ${badgeClass}">${log.risk_level}</span></td>
+          <td>
+            <button class="delete-btn" onclick="deleteLog(${log.id})">刪除</button>
+          </td>
+        `;
+
+        logTableBody.appendChild(tr);
+      });
+    }
+
+    form.addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      const newLog = {
+        log_date: logDate.value,
+        sleep_hours: Number(sleepHours.value),
+        steps: Number(steps.value),
+        mood_score: Number(moodScore.value)
+      };
+
+      const res = await fetch('/health-logs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(newLog)
+      });
+
+      const result = await res.json();
+
+      alert(`新增成功！本次判定結果：${result.risk_level}`);
+
+      sleepHours.value = '';
+      steps.value = '';
+      moodScore.value = '';
+
+      await loadLogs();
+      await loadRisk();
+    });
+
+    async function deleteLog(id) {
+      if (!confirm('確定要刪除這筆資料嗎？')) return;
+
+      await fetch(`/health-logs/${id}`, {
+        method: 'DELETE'
+      });
+
+      await loadLogs();
+      await loadRisk();
+    }
+
+    loadLogs();
+    loadRisk();
+  </script>
+</body>
+</html>
